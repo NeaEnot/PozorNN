@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>974d13f5-00be-4647-b57c-a01cd2e76246</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>PozorNN.py</StartupFile>
+    <StartupFile>TextsStatistic.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -23,6 +23,9 @@
   <ItemGroup>
     <Compile Include="PostsGrabber.py" />
     <Compile Include="PozorNN.py" />
+    <Compile Include="TextsStatistic.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Tokenizer.py">
       <SubType>Code</SubType>
     </Compile>
