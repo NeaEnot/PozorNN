@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>974d13f5-00be-4647-b57c-a01cd2e76246</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>TextsStatistic.py</StartupFile>
+    <StartupFile>PozorNN.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
