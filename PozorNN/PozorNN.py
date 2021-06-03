@@ -5,6 +5,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from datetime import datetime
+
+model_name = 'Model_' + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 files = os.listdir('Dataset')
 dictionary = {}
@@ -15,25 +18,25 @@ with open("Dictionary.json", 'r') as dump:
 char_to_idx = dictionary
 idx_to_char = {v: k for k, v in char_to_idx.items()}
 
+BATCH_SIZE = 16
+
 def text_to_seq(text_sample):
     sequence = np.array([char_to_idx[char] for char in text_sample])
     
     return sequence
 
 def get_batch():
-    SEQ_LEN = 64
-    BATCH_SIZE = 16
+    SEQ_LEN = 128
     
     trains = []
     targets = []
 
     for _ in range(BATCH_SIZE):
-        file = files[np.random.randint(0, len(files))]
         text = ''
 
-        while len(text) < SEQ_LEN:
-            text = ''
-            with open("file", 'r') as f:
+        while len(text) <= SEQ_LEN:
+            file = files[np.random.randint(0, len(files))]
+            with open(f'Dataset\\{file}', 'r', encoding='utf-8') as f:
                 for line in f:
                     text = text + line + '\n'
 
@@ -68,3 +71,82 @@ def evaluate(model, char_to_idx, idx_to_char, start_text=' ', prediction_len=200
         predicted_text += predicted_char
     
     return predicted_text
+
+class TextRNN(nn.Module):
+    
+    def __init__(self, input_size, hidden_size, embedding_size, n_layers=1):
+        super(TextRNN, self).__init__()
+        
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.embedding_size = embedding_size
+        self.n_layers = n_layers
+
+        self.encoder = nn.Embedding(self.input_size, self.embedding_size)
+        self.lstm = nn.LSTM(self.embedding_size, self.hidden_size, self.n_layers)
+        self.dropout = nn.Dropout(0.2)
+        self.fc = nn.Linear(self.hidden_size, self.input_size)
+        
+    def forward(self, x, hidden):
+        x = self.encoder(x).squeeze(2)
+        out, (ht1, ct1) = self.lstm(x, hidden)
+        out = self.dropout(out)
+        x = self.fc(out)
+        return x, (ht1, ct1)
+    
+    def init_hidden(self, batch_size=1):
+        return (torch.zeros(self.n_layers, batch_size, self.hidden_size, requires_grad=True).to(device),
+               torch.zeros(self.n_layers, batch_size, self.hidden_size, requires_grad=True).to(device))
+
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+model = TextRNN(input_size=len(idx_to_char), hidden_size=128, embedding_size=128, n_layers=3)
+model.to(device)
+
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, amsgrad=True)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, 
+    patience=5, 
+    verbose=True, 
+    factor=0.5
+)
+
+n_epochs = 50000
+loss_avg = []
+
+for epoch in range(n_epochs):
+    model.train()
+    train, target = get_batch()
+    train = train.permute(1, 0, 2).to(device)
+    target = target.permute(1, 0, 2).to(device)
+    hidden = model.init_hidden(BATCH_SIZE)
+
+    output, hidden = model(train, hidden)
+    loss = criterion(output.permute(1, 2, 0), target.squeeze(-1).permute(1, 0))
+    
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+    
+    loss_avg.append(loss.item())
+    if len(loss_avg) >= 50:
+        mean_loss = np.mean(loss_avg)
+        print(f'Loss: {mean_loss}')
+        scheduler.step(mean_loss)
+        loss_avg = []
+        model.eval()
+        predicted_text = evaluate(model, char_to_idx, idx_to_char, temp=0.3)
+        print(predicted_text)
+
+        torch.save(model.state_dict(), model_name)
+
+model.eval()
+print(evaluate(
+    model, 
+    char_to_idx, 
+    idx_to_char, 
+    temp=0.3, 
+    prediction_len=172, 
+    start_text=' '
+    )
+)

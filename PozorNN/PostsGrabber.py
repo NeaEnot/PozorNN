@@ -15,7 +15,7 @@ try:
 except Exception as e:
     None
 
-vk_session = vk_api.VkApi('+79278275685', 'Jastinbiber123')
+vk_session = vk_api.VkApi('', '')
 vk_session.auth()
 vk = vk_session.get_api()
 
