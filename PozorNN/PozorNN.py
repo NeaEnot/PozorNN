@@ -18,7 +18,7 @@ with open("Dictionary.json", 'r') as dump:
 char_to_idx = dictionary
 idx_to_char = {v: k for k, v in char_to_idx.items()}
 
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 
 def text_to_seq(text_sample):
     sequence = np.array([char_to_idx[char] for char in text_sample])
@@ -26,7 +26,7 @@ def text_to_seq(text_sample):
     return sequence
 
 def get_batch():
-    SEQ_LEN = 128
+    SEQ_LEN = 64
     
     trains = []
     targets = []
@@ -89,17 +89,19 @@ class TextRNN(nn.Module):
         
     def forward(self, x, hidden):
         x = self.encoder(x).squeeze(2)
+
         out, (ht1, ct1) = self.lstm(x, hidden)
         out = self.dropout(out)
         x = self.fc(out)
+
         return x, (ht1, ct1)
     
     def init_hidden(self, batch_size=1):
         return (torch.zeros(self.n_layers, batch_size, self.hidden_size, requires_grad=True).to(device),
                torch.zeros(self.n_layers, batch_size, self.hidden_size, requires_grad=True).to(device))
 
+model = TextRNN(input_size=len(idx_to_char), hidden_size=30, embedding_size=128, n_layers=1)
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-model = TextRNN(input_size=len(idx_to_char), hidden_size=128, embedding_size=128, n_layers=3)
 model.to(device)
 
 criterion = nn.CrossEntropyLoss()
@@ -108,11 +110,12 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer, 
     patience=5, 
     verbose=True, 
-    factor=0.5
+    factor=0.75
 )
 
-n_epochs = 50000
+n_epochs = 500000
 loss_avg = []
+min_loss = 10
 
 for epoch in range(n_epochs):
     model.train()
@@ -131,6 +134,11 @@ for epoch in range(n_epochs):
     loss_avg.append(loss.item())
     if len(loss_avg) >= 50:
         mean_loss = np.mean(loss_avg)
+
+        if (mean_loss < min_loss):
+            min_loss = mean_loss
+            print('\a')
+
         print(f'Loss: {mean_loss}')
         scheduler.step(mean_loss)
         loss_avg = []
@@ -147,6 +155,6 @@ print(evaluate(
     idx_to_char, 
     temp=0.3, 
     prediction_len=172, 
-    start_text=' '
+    start_text='. '
     )
 )
